@@ -34,14 +34,31 @@ Computes an approximation of the ``k`` nearest neighbor graph
 """
 function knngraph(dist::SemiMetric, input::String; output::String, k::Int=16, minrecall::Float64=0.95, normalize=true, key::String="emb")
     X = load_sentence_embeddings(input; key, normalize)
-    G = SearchGraph(; dist, db=MatrixDatabase(X))
-    minrecall = MinRecall(minrecall)
-    callbacks = SearchGraphCallbacks(minrecall)
-    index!(G; callbacks)
-    optimize!(G, minrecall)
+    G = create_index(dist, StrideMatrixDatabase(X); k, minrecall)
     knns, dists = allknn(G, k)
     jldsave(output; knns, dists)
     knns, dists
+end
+
+
+"""
+    create_index(dist::SemiMetric, db::AbstractDatabase; k::Int=16, minrecall::Float64=0.95, verbose=true)
+
+Creates an index for the given database
+
+- `dist`: Distance function
+- `db`: input database
+- `k`: the number of neighbors (only for optimization purposes)
+- `minrecall`: controls the quality of the approximation (between 0 and 1)
+- `verbose`: set `verbose=false` to reduce the output of the index's building
+"""
+function create_index(dist::SemiMetric, db::AbstractDatabase; k::Int=16, minrecall::Float64=0.95, verbose::Bool=true)
+    G = SearchGraph(; dist, db)
+    minrecall = MinRecall(minrecall)
+    callbacks = SearchGraphCallbacks(minrecall; ksearch=k, verbose)
+    index!(G; callbacks)
+    optimize!(G, minrecall)
+    G
 end
 
 """
@@ -57,7 +74,7 @@ Computes a sample of size `n_samples` of the pairwise distance matrix
 - `key`: the name of the dataset inside of the input file
 """
 function distsample(dist::SemiMetric, input::String; output::String, prob::Float64=0.1, key::String="emb", normalize::Bool=true)
-    X = load_sentence_embeddings(input; key, normalize) |> MatrixDatabase
+    X = load_sentence_embeddings(input; key, normalize) |> StrideMatrixDatabase
     n = length(X)
     S = Float32[]
     sizehint!(S, ceil(Int, prob * n))
@@ -75,11 +92,33 @@ function distsample(dist::SemiMetric, input::String; output::String, prob::Float
     S  
 end
 
+"""
+    remove_neardup(dist::SemiMetric, input::String; output::String, epsilon::Float64=0.1, key::String="emb", minrecall::Float64=0.9, normalize::Bool=true)
+
+Remove near duplicates in the embedding readed from `input`
+
+- `dist`: Distance function
+- `epsilon`: items are appended incrementally; an item is accepted if there is not an item at distance `epsilon` and rejected if already exists an item at that distance
+- `input`: input embedding file (h5 format)
+- `output`: filename to save the `idx`, `map`, `nn`, and `dists` (h5 format)
+- `minrecall`: controls the quality of the approximation (between 0 and 1)
+- `normalize`: true if the embeddings must be adjusted to have unitary norm
+- `key`: the name of the dataset inside of the input file
+    
+"""
+
+function remove_neardup(dist::SemiMetric, input::String; output::String, epsilon::Float64=0.1, key::String="emb", minrecall::Float64=0.9, normalize::Bool=true)
+    X = load_sentence_embeddings(input; key, normalize) |> StrideMatrixDatabase
+    db = VectorDatabase(Vector{Float32}[])
+    p = neardup(SearchGraph(; db, dist), X, epsilon)
+    jldsave(output; p.idx, p.map, p.nn, p.dist)
+    p
+end
     #=
         D = DataFrame(JSON.parse.(eachline("datasets/comp2023/IberLEF2023_HOMO-MEX_Es_train.json")))
 D = DataFrame(JSON.parse.(eachline("datasets/comp2023/IberLEF2023_HOMO-MEX_Es_train.json")))
 
-        for r in eachrow(D[knns[:, 1], :])
+        for r in eachrow(D[enns[:, 1], :])
             println(r)
         end
 # time: 2023-09-01 12:31:51 CST
