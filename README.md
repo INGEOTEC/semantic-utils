@@ -4,8 +4,7 @@
 
 ```bash
 conda create -n "semantic"
-conda install pip
-conda run -n semantic pip install sentence-transformers h5py 
+conda install -n semantic -c conda-forge sentence-transformers h5py
 
 ```
 

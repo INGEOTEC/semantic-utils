@@ -28,7 +28,6 @@ def json_tweets(filename, output=None, key="text"):
 
     assert len(T) > 0, f"ERROR {filename} is empty"
     print(T[:10])
-    sys.exit(0)
 
     print(f"** encoding with {modelname}")
     emb = model.encode(T)

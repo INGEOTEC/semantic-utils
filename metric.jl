@@ -19,10 +19,11 @@ function load_sentence_embeddings(filename; key, normalize)
 end
 
 """
-    knngraph(input::String; output::String, k::Int=16, minrecall::Float64=0.95, normalize=true, key::String="emb")
+    knngraph(dist::SemiMetric, input::String; output::String, k::Int=16, minrecall::Float64=0.95, normalize=true, key::String="emb")
 
 Computes an approximation of the ``k`` nearest neighbor graph
 
+- `dist`: Distance function
 - `input`: input embedding file (h5 format)
 - `output`: filename to save the knn graph (using two matrices `knns` and `dists` of identifiers and distances)
 - `k`: the number of neighbors 
@@ -31,9 +32,9 @@ Computes an approximation of the ``k`` nearest neighbor graph
 - `key`: the name of the dataset inside of the input file
     
 """
-function knngraph(input::String; output::String, k::Int=16, minrecall::Float64=0.95, normalize=true, key::String="emb")
+function knngraph(dist::SemiMetric, input::String; output::String, k::Int=16, minrecall::Float64=0.95, normalize=true, key::String="emb")
     X = load_sentence_embeddings(input; key, normalize)
-    G = SearchGraph(dist=NormalizedCosineDistance(), db=MatrixDatabase(X))
+    G = SearchGraph(; dist, db=MatrixDatabase(X))
     minrecall = MinRecall(minrecall)
     callbacks = SearchGraphCallbacks(minrecall)
     index!(G; callbacks)
@@ -43,15 +44,35 @@ function knngraph(input::String; output::String, k::Int=16, minrecall::Float64=0
     knns, dists
 end
 
-
 """
-    distancesample(input::String; output::String, key::String="emb", normalize=true)
+    distsample(dist::SemiMetric, input::String; output::String, n_samples::Int=0, normalize=true, key::String="emb")
+    
+Computes a sample of size `n_samples` of the pairwise distance matrix
 
-Computes an histogram of distances for the given input (using samples)
+- `dist`: Distance function
+- `input`: input embedding file (h5 format)
+- `output`: filename to save the sample
+- `prob`: sampling probability (on the upper triangle pairwise distance matrix)
+- `normalize`: true if the embeddings must be adjusted to have unitary norm
+- `key`: the name of the dataset inside of the input file
 """
-function distancesample(input::String; output::String, k::Int=16, key::String="emb", minrecall::Float64=0.95, normalize=true)
-    X = load_sentence_embeddings(input; key, normalize)
+function distsample(dist::SemiMetric, input::String; output::String, prob::Float64=0.1, key::String="emb", normalize::Bool=true)
+    X = load_sentence_embeddings(input; key, normalize) |> MatrixDatabase
+    n = length(X)
+    S = Float32[]
+    sizehint!(S, ceil(Int, prob * n))
 
+    for i in 1:n
+        for j in i+1:n-1
+            if rand() <= prob
+                push!(S, evaluate(dist, X[i], X[j]))
+            end
+        end
+    end
+   
+    sort!(S)
+    jldsave(output; dists=S)
+    S  
 end
 
     #=
