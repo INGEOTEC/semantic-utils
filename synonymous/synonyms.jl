@@ -34,7 +34,7 @@ function create_graph(knns)
     G
 end
 
-function shortest_path_synonymous()
+function shortest_path_synonyms()
     names, weights = jldopen("evomsa/evomsa-bow-es-voc=17.h5") do f
         JSON.parse(f["names"]), f["weights"]
     end
@@ -86,7 +86,7 @@ function shortest_path_synonymous()
     (; G, vocab, ivocab, ovocab, regions)
 end
 
-function similarity_synonymous()
+function similarity_synonyms()
     names, weights = jldopen("evomsa/evomsa-bow-es-voc=17.h5") do f
         JSON.parse(f["names"]), f["weights"]
     end
