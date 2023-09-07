@@ -1,4 +1,4 @@
-using JSON, SimilaritySearch, JLD2, DataFrames, LinearAlgebra
+using JSON, SimilaritySearch, JLD2, DataFrames, LinearAlgebra, SimSearchManifoldLearning
 
 """
     load_sentence_embeddings(filename; key, normalize)
@@ -53,7 +53,7 @@ Creates an index for the given database
 - `verbose`: set `verbose=false` to reduce the output of the index's building
 """
 function create_index(dist::SemiMetric, db::AbstractDatabase; k::Int=16, minrecall::Float64=0.95, verbose::Bool=true)
-    G = SearchGraph(; dist, db)
+    G = SearchGraph(; dist, db, verbose)
     minrecall = MinRecall(minrecall)
     callbacks = SearchGraphCallbacks(minrecall; ksearch=k, verbose)
     index!(G; callbacks)
@@ -120,9 +120,9 @@ Remove near duplicates in the embedding readed from `input`
 - `minrecall`: controls the quality of the approximation (between 0 and 1)
 - `normalize`: true if the embeddings must be adjusted to have unitary norm
 - `key`: the name of the dataset inside of the input file
-    
+- `verbose`: verbose output    
 """
-function neardup_analysis(dist::SemiMetric, input::String; output::String, epsilon::Float64=0.1, key::String="emb", minrecall::Float64=0.9, normalize::Bool=true)
+function neardup_analysis(dist::SemiMetric, input::String; output::String, epsilon::Float64=0.1, key::String="emb", minrecall::Float64=0.9, normalize::Bool=true, verbose=true)
     X = load_sentence_embeddings(input; key, normalize) |> StrideMatrixDatabase
     p = neardup_analysis(dist, X; epsilon, minrecall, verbose)
     jldsave(output; p.idx, p.map, p.nn, p.dist)
@@ -131,7 +131,7 @@ end
 
 
 """
-    neardup_analysis(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9)
+    neardup_analysis(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9, verbose=true)
 
 Finds near duplicates in the `X` database using an incremental algorithma. Returns a the named duple
 - `idx`: an index with the set of non near duplicates under the given parameters
@@ -144,15 +144,15 @@ Finds near duplicates in the `X` database using an incremental algorithma. Retur
 - `X`: input database
 - `epsilon`: items are appended incrementally; an item is accepted if there is not an item at distance `epsilon` and rejected if already exists an item at that distance
 - `minrecall`: controls the quality of the approximation (between 0 and 1)
-    
+- `verbose`: verbose output
 """
-function neardup_analysis(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9)
+function neardup_analysis(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9, verbose=true)
     db = VectorDatabase(Vector{Float32}[])
-    neardup(SearchGraph(; db, dist), X, epsilon)
+    neardup(SearchGraph(; db, dist, verbose), X, epsilon)
 end
 
 """
-    filter_neardup(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9)
+    filter_neardup(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9, verbose=true)
 
 Remove near duplicates in the embedding readed from `input`
 
@@ -160,13 +160,54 @@ Remove near duplicates in the embedding readed from `input`
 - `X`: input database
 - `epsilon`: items are appended incrementally; an item is accepted if there is not an item at distance `epsilon` and rejected if already exists an item at that distance
 - `minrecall`: controls the quality of the approximation (between 0 and 1)
-    
+- `verbose`: verbose output
 """
-function filter_neardup(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9)
-    p = neardup_analysis(dist, X; epsilon, minrecall)
+function filter_neardup(dist::SemiMetric, X::AbstractDatabase; epsilon::Float64=0.1, minrecall::Float64=0.9, verbose=true)
+    p = neardup_analysis(dist, X; epsilon, minrecall, verbose)
     MatrixDatabase(database(p.idx))
-    db = VectorDatabase(Vector{Float32}[])
-    neardup(SearchGraph(; db, dist), X, epsilon)
+end
+
+"""
+    umap_embeddings(
+        index::AbstractSearchIndex,
+        k = 15,
+        n_epochs = 100,
+        neg_sample_rate = 3,
+        tol = 1e-4,
+        layout = SpectralLayout(),
+    )
+
+Computes a 2D and 3D umap embeddings for the given database (i.e., in the form of `index`)
+
+- `index`: the indexed metric database
+- `k`: the number of neighbors for the embedding
+- `n_epochs`: number of epochs to refine the embedding
+- `neg_sample_rate`: negative sampling rate (3 or 5 give good results)
+- `tol`: stop tolerance for the iterative optimization (early stopping)
+- `layout`: initialization method for the embedding
+"""
+function umap_embeddings(
+    index::AbstractSearchIndex,
+    k = 15,
+    n_epochs = 100,
+    neg_sample_rate = 3,
+    tol = 1e-4,
+    layout = SpectralLayout(),
+)
+    # increase both `n_epochs` and `neg_sample_rate` to improve projection
+    #layout = SpectralLayout() ## the results are much better with Spectral layout
+    @time U2 = fit(UMAP, index; k, neg_sample_rate, layout, n_epochs, tol)
+    @time U3 = fit(U2, 3; neg_sample_rate, n_epochs, tol)  # reuses U2
+    #jldsave(umapfile, e2=U2.embedding, e3=U3.embedding)
+    e2 = predict(U2)
+    e3 = predict(U3)
+    (; e2, e3)
+end
+
+function normcolors(V)
+    min_, max_ = extrema(V)
+    V .= (V .- min_) ./ (max_ - min_)
+    V .= clamp.(V, 0, 1)
 end
 
 #=
