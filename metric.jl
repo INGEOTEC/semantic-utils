@@ -1,4 +1,4 @@
-using JSON, SimilaritySearch, JLD2, DataFrames, LinearAlgebra, SimSearchManifoldLearning
+using JSON, SimilaritySearch, JLD2, LinearAlgebra, SimSearchManifoldLearning
 
 """
     load_sentence_embeddings(filename; key, normalize)
