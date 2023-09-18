@@ -35,10 +35,20 @@ function similarity_synonyms(names, vocab, embeddings, dist; verbose=true, k=12,
     (; G, vocab, ivocab, ivocabidx, knns, dists)
 end
 
-function create_map(p::NamedTuple; quant=0.02)
+function distquantiles(dist::SemiMetric, X::AbstractDatabase, q=[0.0, 0.25, 0.5, 0.75, 1.0]; samplesize=2^20)
+    n = length(X)
+    S = Vector{Float32}(undef, samplesize)
+    
+    Threads.@threads for i in 1:samplesize
+        S[i] = evaluate(dist, X[rand(1:n)], X[rand(1:n)])
+    end
+
+    quantile(S, q)
+end
+
+function create_map(p::NamedTuple, dmax)
     println("creating map")
     map = Dict{String,String}()
-    dmax = quantile(p.dists[1, :], quant)
     
     for i in 1:size(p.knns, 2)
        nn = p.knns[1, i]
@@ -56,16 +66,17 @@ function create_map(p::NamedTuple; quant=0.02)
 end
 
 
-function main(; outfile::String, quant::AbstractFloat, emb::NamedTuple, train::DataFrame, mindocs::Integer, maxndocs=0.5)
+function main(; outfile::String, quant::AbstractFloat, emb::NamedTuple, train::DataFrame, mindocs::Integer, maxndocs=0.5, mapfile=nothing)
     # train = read_json_dataframe(datafile) 
     # emb = load_fasttext_embeddings(embeddingsfile)
-    voc = vocab(Nothing, train.text; nlist=[1], qlist=[], collocations=0, mindocs, maxndocs)
-    dataset_tokens = token(voc)
-    s = similarity_synonyms(dataset_tokens, emb.vocab, emb.embeddings, emb.dist)
-    map = create_map(s; quant)
-    
+    voc = vocab(Nothing, train.text; nlist=[1], qlist=[], collocations=0, mindocs, maxndocs, mapfile)
+    # @show voc, vocsize(voc)
+    s = similarity_synonyms(token(voc), emb.vocab, emb.embeddings, emb.dist)
+    dmax = distquantiles(emb.dist, StrideMatrixDatabase(emb.embeddings), quant)
+    map = create_map(s, dmax)
+
     open(outfile, "w") do f
-           print(f, json(map, 2))
+        print(f, json(map, 2))
     end
 
     map

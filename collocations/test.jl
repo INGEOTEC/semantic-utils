@@ -6,16 +6,16 @@ using UnicodePlots
 include("io.jl")
 include("voctrans.jl")
 
-function vocab(::Type{T}, text; mapfile, nlist, qlist, collocations, mindocs, maxndocs) where {T<:Union{AbstractTokenTransformation,Nothing}}
-    tc = TextConfig(; nlist, del_diac=true, del_punc=true)
+function vocab(::Type{T}, text; mapfile=nothing, nlist, qlist, collocations, mindocs, maxndocs) where {T<:Union{AbstractTokenTransformation,Nothing}}
+    tc = TextConfig(; nlist, del_punc=false, del_diac=true, lc=true)
     tt = if T === IgnoreStopwords
         sw = spanish_stopwords(tc)
         IgnoreStopwords(sw)
     elseif T === Synonyms
-        Synonyms(open(JSON.parse, mapfile)) #read_synonyms("map-fastText-to-haha.json"))
+        Synonyms(open(JSON.parse, mapfile))
     elseif T === ChainTransformation
         sw = spanish_stopwords(tc)
-        ChainTransformation([IgnoreStopwords(sw), Synonyms(read_synonyms(mapfile))])
+        ChainTransformation([IgnoreStopwords(sw), Synonyms(open(JSON.parse, mapfile))])
     else
         IdentityTokenTransformation()
     end
@@ -23,7 +23,7 @@ function vocab(::Type{T}, text; mapfile, nlist, qlist, collocations, mindocs, ma
     V = Vocabulary(TextConfig(tc; qlist, collocations, tt), text)
 
     filter_tokens(V) do t
-      mindocs < t.ndocs < trainsize(V) * maxndocs
+        mindocs <= t.ndocs < trainsize(V) * maxndocs
     end
 end
 
@@ -34,7 +34,7 @@ function textclassifier(train, test;
         gw=EntropyWeighting(),
         lw=BinaryLocalWeighting(),
         voctype::Type=Nothing,
-        mapfile = "map-ft-delitos-0.4-3.json",
+        mapfile = nothing,
         collocations::Integer=0,
         nlist::Vector=[1],
         qlist::Vector=[],
@@ -58,6 +58,6 @@ end
  
 #train = read_json_dataframe("datasets/competitions/haha2018_Es_train.json")
 #test = read_json_dataframe("datasets/competitions/haha2018_Es_test.json")
-train = read_json_dataframe("datasets/datasets/delitos_ingeotec_Es_train.json")
-test = read_json_dataframe("datasets/datasets/delitos_ingeotec_Es_test.json")
+#train = read_json_dataframe("datasets/datasets/delitos_ingeotec_Es_train.json")
+#test = read_json_dataframe("datasets/datasets/delitos_ingeotec_Es_test.json")
 # E = totable(model, DataFrame) 
