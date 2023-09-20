@@ -1,63 +1,118 @@
 using TextSearch, SimilaritySearch, JSON, JLD2, DataFrames
-using Languages, LIBLINEAR, StatsBase, KNearestCenters, Embeddings
+using Languages, LIBLINEAR, KNearestCenters, Embeddings
+using MLUtils, StatsBase
 using UnicodePlots
+import StatsAPI: predict, fit
 
 
 include("io.jl")
-include("voctrans.jl")
+include("vocab.jl")
 
-function vocab(::Type{T}, text; mapfile=nothing, nlist, qlist, collocations, mindocs, maxndocs) where {T<:Union{AbstractTokenTransformation,Nothing}}
-    tc = TextConfig(; nlist, del_punc=false, del_diac=true, lc=true)
-    tt = if T === IgnoreStopwords
-        sw = spanish_stopwords(tc)
-        IgnoreStopwords(sw)
-    elseif T === Synonyms
-        Synonyms(open(JSON.parse, mapfile))
-    elseif T === ChainTransformation
-        sw = spanish_stopwords(tc)
-        ChainTransformation([IgnoreStopwords(sw), Synonyms(open(JSON.parse, mapfile))])
-    else
-        IdentityTokenTransformation()
-    end
-    
-    V = Vocabulary(TextConfig(tc; qlist, collocations, tt), text)
 
-    filter_tokens(V) do t
-        mindocs <= t.ndocs < trainsize(V) * maxndocs
-    end
+struct BagOfSemanticWords{VectorModel,CLS}
+    model::VectorModel
+    cls::CLS
 end
 
-vectormodel(gw::EntropyWeighting, lw, train, V) = VectorModel(gw, lw, V, train.text, train.klass)
-vectormodel(gw, lw, train, V) = VectorModel(gw, lw, V)
+vectormodel(gw::EntropyWeighting, lw, corpus, labels, V) = VectorModel(gw, lw, V, corpus, labels)
+vectormodel(gw, lw, corpus, labels, V) = VectorModel(gw, lw, V)
 
-function textclassifier(train, test; 
+
+function fit(::Type{BagOfSemanticWords}, corpus, labels, tt=IdentityTokenTransformation();
         gw=EntropyWeighting(),
         lw=BinaryLocalWeighting(),
-        voctype::Type=Nothing,
-        mapfile = nothing,
         collocations::Integer=0,
         nlist::Vector=[1],
-        qlist::Vector=[],
+        textconfig=TextConfig(; nlist, del_punc=false, del_diac=true, lc=true),
+        qlist::Vector=[2, 3],
         mindocs::Integer=3,
         maxndocs::AbstractFloat=0.5
     )
 
-    V = vocab(voctype, train.text; collocations, mapfile, nlist, qlist, mindocs, maxndocs)
-    model = vectormodel(gw, lw, train, V)
-    X, y, dim = vectorize_corpus(model, train.text), train.klass, vocsize(model)
-    cls = linear_train(y, sparse(X, dim))     
-    Xtest = vectorize_corpus(model, test.text)
-    ypred, ypred_decision = linear_predict(cls, sparse(Xtest, dim))
-    scores = classification_scores(test.klass, ypred)
-    @info json(scores, 2)
-    (;  gw, lw, voctype, collocations, nlist, qlist, mindocs, maxndocs,
-        vocsize=vocsize(V), trainsize=length(y), testsize=length(ypred),
-        dist=(train=countmap(y), test=countmap(test.klass), pred=countmap(ypred)),
-        scores), model
+    V = vocab(corpus, tt; collocations, nlist, qlist, mindocs, maxndocs)
+    model = vectormodel(gw, lw, corpus, labels, V)
+    X, y, dim = vectorize_corpus(model, corpus), labels, vocsize(model)
+    BagOfSemanticWords(model, linear_train(y, sparse(X, dim)))
 end
- 
-#train = read_json_dataframe("datasets/competitions/haha2018_Es_train.json")
-#test = read_json_dataframe("datasets/competitions/haha2018_Es_test.json")
-#train = read_json_dataframe("datasets/datasets/delitos_ingeotec_Es_train.json")
-#test = read_json_dataframe("datasets/datasets/delitos_ingeotec_Es_test.json")
-# E = totable(model, DataFrame) 
+
+function predict_corpus(B::BagOfSemanticWords, corpus)
+    Xtest = vectorize_corpus(B.model, corpus)
+    dim = vocsize(B.model)
+    pred, decision_value = linear_predict(B.cls, sparse(Xtest, dim))
+    (; pred, decision_value)
+end
+
+function test(config) 
+    train = read_json_dataframe(config.trainfile)
+    test = read_json_dataframe(config.testfile)
+    tt = Synonyms(config.mapfile)
+    C = fit(BagOfSemanticWords, train.text, train.klass, tt; config.collocations, config.mindocs, config.qlist, config.gw, config.lw)
+    y = predict_corpus(C, test.text)
+    scores = classification_scores(test.klass, y.pred)
+    @info json(scores, 2)
+    
+    (; config, scores,
+       size=(voc=vocsize(C.model), train=size(train, 1), test=length(y.pred)),
+       dist=(train=countmap(train.klass), test=countmap(test.klass), pred=countmap(y.pred))
+    )
+end
+
+function embedding_by_lang(lang)
+    if lang == "es"
+        "embeddings/glove-embeddings-es-300d.h5"
+    else
+        error("I don't have support for lang $lang")
+    end
+end
+
+function create_vocabmap(config; embfile=embedding_by_lang(config.lang), nick=config.nick, quantlist=[0.01, 0.03, 0.1, 0.3, 1])
+    train = read_json_dataframe(config.trainfile)
+    emb = load_emb(embfile)
+
+    for mindocs in [1], quant in quantlist
+        main_vocabmap(; outfile="map-$nick-$quant-$mindocs.json", quant, mindocs, train, emb)
+    end
+end
+
+haha2018(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=7, mindocs=3, maxndocs=0.5, qlist=[2,5]) = (;
+    trainfile = "datasets/competitions/haha2018_Es_train.json",
+    testfile = "datasets/competitions/haha2018_Es_test.json",
+    mapfile = "map-haha2018-0.01-1.json",
+    nick = "haha2018",
+    lang = "es",
+    gw,
+    lw,
+    collocations,
+    mindocs,
+    maxndocs,
+    qlist
+   )
+
+exist2021(; gw=IdfWeighting(), lw=BinaryLocalWeighting(), collocations=4, mindocs=2, maxndocs=0.5, qlist=[2,5]) = (;
+    trainfile = "datasets/datasets/exist2021_task1_Es_train.json",
+    testfile = "datasets/datasets/exist2021_task1_Es_test.json", 
+    mapfile = "map-exist2021-1.0-1.json",
+    nick = "exist2021",
+    lang = "es",
+    gw,
+    lw,
+    collocations,
+    mindocs,
+    maxndocs,
+    qlist
+   )
+
+delitos(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=7, mindocs=3, maxndocs=0.5, qlist=[2,5]) = (;
+    trainfile = "datasets/datasets/delitos_ingeotec_Es_train.json",
+    testfile = "datasets/datasets/delitos_ingeotec_Es_test.json",
+    mapfile = "map-delitos-0.01-1.json",
+    nick = "delitos",
+    lang = "es",
+    gw,
+    lw,
+    collocations,
+    mindocs,
+    maxndocs,
+    qlist
+   )
+
