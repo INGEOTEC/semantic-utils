@@ -1,0 +1,8 @@
+[deps]
+CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
+Embeddings = "c5bfea45-b7f1-5224-a596-15500f5db411"
+Glowe = "d04f5788-f3bf-50c4-8044-9206750af6c9"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+TextSearch = "7f6f6c8a-3b03-11e9-223d-e7d88259bd6c"
