@@ -26,7 +26,7 @@ haha2018(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=7, min
         spelling
    )
 
-exist2021(; gw=IdfWeighting(), lw=BinaryLocalWeighting(), collocations=4, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile="mapping/map-exist2021-1.0-1.json") =
+exist2021(; gw=IdfWeighting(), lw=BinaryLocalWeighting(), collocations=4, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile="mapping/map-exist2021-1.0-1.json", spelling=nothing) =
     (;
         trainfile = "datasets/datasets/exist2021_task1_Es_train.json",
         testfile = "datasets/datasets/exist2021_task1_Es_test.json",
@@ -38,25 +38,42 @@ exist2021(; gw=IdfWeighting(), lw=BinaryLocalWeighting(), collocations=4, mindoc
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
    )
 
-hope2023(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[4,5], mapfile=nothing) =
+hope2023en(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[4,5], mapfile=nothing, spelling=nothing) =
+    (;
+        trainfile = "datasets/comp2023/IberLEF2023_HOPE_En_train.json",
+        testfile = "datasets/comp2023/IberLEF2023_HOPE_En_test.json",
+        mapfile,
+        nick = "hope2023-en",
+        lang = "en",
+        gw,
+        lw,
+        collocations,
+        mindocs,
+        maxndocs,
+        qlist,
+        spelling
+   )
+hope2023es(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[4,5], mapfile=nothing, spelling=nothing) =
     (;
         trainfile = "datasets/comp2023/IberLEF2023_HOPE_Es_train.json",
         testfile = "datasets/comp2023/IberLEF2023_HOPE_Es_test.json",
         mapfile,
-        nick = "hope2023",
+        nick = "hope2023-es",
         lang = "es",
         gw,
         lw,
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
    )
 
-huhu2023(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=3, maxndocs=0.5, qlist=[2,5], mapfile="mapping/map-huhu2023-0.01-1.json") =
+huhu2023(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=3, maxndocs=0.5, qlist=[2,5], mapfile="mapping/map-huhu2023-0.01-1.json", spelling=nothing) =
     (;
         trainfile = "datasets/comp2023/IberLEF2023_HUHU_task1_Es_train.json",
         testfile = "datasets/comp2023/IberLEF2023_HUHU_task1_Es_test.json",
@@ -68,7 +85,8 @@ huhu2023(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mi
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
    )
 
 
@@ -88,7 +106,7 @@ delitos(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=7, mind
         spelling
    )
 
-offenseval2019A(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing) =
+offenseval2019A(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing, spelling=nothing) =
     (;
         trainfile = "datasets/datasets/offenseval2019_A_En_train.json",
         testfile = "datasets/datasets/offenseval2019_A_En_test.json",
@@ -100,10 +118,11 @@ offenseval2019A(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
    )
 
-meoffendes2021task3(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing) =
+meoffendes2021task3(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing, spelling=nothing) =
     (;
         trainfile = "datasets/datasets/meoffendes2021_task3_Es_train.json",
         testfile = "datasets/datasets/meoffendes2021_task3_Es_test.json",
@@ -115,10 +134,11 @@ meoffendes2021task3(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mind
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
    )
 
-meoffendes2021task1(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing) =
+meoffendes2021task1(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing, spelling=nothing) =
     (;
         trainfile = "datasets/datasets/meoffendes2021_task1_Es_train.json",
         testfile = "datasets/datasets/meoffendes2021_task1_Es_test.json",
@@ -130,10 +150,11 @@ meoffendes2021task1(; gw=IdfWeighting(), lw=TfWeighting(), collocations=10, mind
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
    )
 
-politicES2023_gender(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing) =
+politicES2023_gender(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), collocations=10, mindocs=2, maxndocs=0.5, qlist=[2,5], mapfile=nothing, spelling=nothing) =
     (;
         trainfile = "datasets/comp2023/IberLEF2023_PoliticEs_gender_Es_train.json.gz",
         testfile = "datasets/comp2023/IberLEF2023_PoliticEs_gender_Es_test.json.gz",
@@ -145,5 +166,22 @@ politicES2023_gender(; gw=EntropyWeighting(), lw=BinaryLocalWeighting(), colloca
         collocations,
         mindocs,
         maxndocs,
-        qlist
+        qlist,
+        spelling
+   )
+
+restmex2023_polarity(; gw = EntropyWeighting(), lw = BinaryLocalWeighting(), collocations = 5, mindocs = 7, maxndocs = 1.0, minweight = 0.0001, qlist = [2, 5], mapfile = nothing, spelling=nothing)=
+    (;
+        trainfile = "datasets/comp2023/IberLEF2023_RestMex_task1_polarity_Es_train.json.gz",
+        testfile = "datasets/comp2023/IberLEF2023_RestMex_task1_polarity_Es_dev.json.gz",
+        mapfile,
+        nick = "Restmex2023-polarity",
+        lang = "es",
+        gw,
+        lw,
+        collocations,
+        mindocs,
+        maxndocs,
+        qlist,
+        spelling
    )
